@@ -23,7 +23,7 @@ pipeline {
         stage('Checkout from Git') {
             steps {
                 git branch: 'main', url: 'https://github.com/SriVenkat-1/Book-My-Show.git'
-                sh 'ls -la'  // Verify files after checkout
+                sh 'ls -la'
             }
         }
 
@@ -31,9 +31,9 @@ pipeline {
             steps {
                 withSonarQubeEnv('sonar-server') {
                     sh '''
-                    $SCANNER_HOME/bin/sonar-scanner \
-                        -Dsonar.projectName=BMS \
-                        -Dsonar.projectKey=BMS
+                        $SCANNER_HOME/bin/sonar-scanner \
+                            -Dsonar.projectName=BMS \
+                            -Dsonar.projectKey=BMS
                     '''
                 }
             }
@@ -50,15 +50,15 @@ pipeline {
         stage('Install Dependencies') {
             steps {
                 sh '''
-                cd bookmyshow-app
-                ls -la  # Verify package.json exists
-                if [ -f package.json ]; then
-                    rm -rf node_modules package-lock.json  # Remove old dependencies
-                    npm install  # Install fresh dependencies
-                else
-                    echo "Error: package.json not found in bookmyshow-app!"
-                    exit 1
-                fi
+                    cd bookmyshow-app
+                    ls -la
+                    if [ -f package.json ]; then
+                        rm -rf node_modules package-lock.json
+                        npm install
+                    else
+                        echo "Error: package.json not found in bookmyshow-app!"
+                        exit 1
+                    fi
                 '''
             }
         }
@@ -66,13 +66,13 @@ pipeline {
         stage('Docker Build & Push') {
             steps {
                 script {
-                    withDockerRegistry(credentialsId: 'dockerhub-creds', toolName: 'docker') {
+                    withDockerRegistry([credentialsId: 'dockerhub-creds', url: 'https://index.docker.io/v1/']) {
                         sh '''
-                        echo "Building Docker image..."
-                        docker build --no-cache -t $DOCKER_IMAGE -f bookmyshow-app/Dockerfile bookmyshow-app
+                            echo "Building Docker image..."
+                            docker build --no-cache -t $DOCKER_IMAGE -f bookmyshow-app/Dockerfile bookmyshow-app
 
-                        echo "Pushing Docker image to Docker Hub..."
-                        docker push $DOCKER_IMAGE
+                            echo "Pushing Docker image to Docker Hub..."
+                            docker push $DOCKER_IMAGE
                         '''
                     }
                 }
@@ -81,12 +81,15 @@ pipeline {
 
         stage('Deploy to EKS Cluster') {
             steps {
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'aws-cred'
-                ]]) {
-                    script {
-                        sh '''
+                withCredentials([
+                    [
+                        $class: 'AmazonWebServicesCredentialsBinding',
+                        credentialsId: 'aws-creds',
+                        accessKeyVariable: 'AWS_ACCESS_KEY_ID',
+                        secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                    ]
+                ]) {
+                    sh '''
                         echo "Verifying AWS credentials..."
                         aws sts get-caller-identity
 
@@ -97,14 +100,13 @@ pipeline {
                         kubectl config view
 
                         echo "Deploying application to EKS..."
-                        kubectl apply -f deployment.yml
-                        kubectl apply -f service.yml
+                        kubectl apply -f deployment.yaml
+                        kubectl apply -f service.yaml
 
                         echo "Verifying deployment..."
                         kubectl get pods
                         kubectl get svc
-                        '''
-                    }
+                    '''
                 }
             }
         }
@@ -112,13 +114,16 @@ pipeline {
 
     post {
         always {
-            emailext attachLog: true,
+            emailext(
+                attachLog: true,
                 subject: "'${currentBuild.result}'",
-                body: "Project: ${env.JOB_NAME}<br/>" +
-                      "Build Number: ${env.BUILD_NUMBER}<br/>" +
-                      "URL: ${env.BUILD_URL}<br/>",
+                body: """
+                    Project: ${env.JOB_NAME}<br/>
+                    Build Number: ${env.BUILD_NUMBER}<br/>
+                    URL: ${env.BUILD_URL}<br/>
+                """,
                 to: 'srivenkataddagarla3331@gmail.com'
+            )
         }
     }
 }
-
