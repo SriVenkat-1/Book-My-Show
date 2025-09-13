@@ -65,10 +65,10 @@ pipeline {
                     withDockerRegistry(credentialsId: 'dockerhub-creds', toolName: 'docker') {
                         sh '''
                         echo "Building Docker image..."
-                        docker build --no-cache -t $DOCKER_IMAGE -f bookmyshow-app/Dockerfile bookmyshow-app
+                        docker build --no-cache -t srivenkat19 -f bookmyshow-app/Dockerfile bookmyshow-app
 
                         echo "Pushing Docker image to registry..."
-                        docker push $DOCKER_IMAGE
+                        docker push srivenkat19/bms:latest
                         '''
                     }
                 }
@@ -83,7 +83,7 @@ pipeline {
                 docker rm bms || true
 
                 echo "Running new container on port 3000..."
-                docker run -d --restart=always --name bms -p 3000:3000 $DOCKER_IMAGE
+                docker run -d --restart=always --name bms -p 3000:3000 srivenkat19/bms:latest
 
                 echo "Checking running containers..."
                 docker ps -a
